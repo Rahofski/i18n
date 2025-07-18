@@ -4,7 +4,6 @@ import { IntlProvider } from 'react-intl';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 import { DEFAULT_LOCALE, LANG_COOKIE_NAME, SUPPORTED_LANGS } from '@/constants';
-import { geoService } from '@/lib/geo-service';
 import { getTranslations } from '@/lib/translations';
 import type { Lang, Locale } from '@/types';
 
@@ -39,39 +38,32 @@ export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
   
   // 2. Функция проверки и нормализации локали
   const getValidLocale = (locale: Locale | undefined): Locale | undefined => {
-    // Если локаль не определена, возвращаем undefined
-    if (!locale) {
-      return undefined;
+  if (!locale) {
+    return undefined;
+  }
+
+  const parts = locale.split('-');
+  const lang = parts[0];
+  const region = parts[1];
+
+  if (!SUPPORTED_LANGS.includes(lang as Lang)) {
+    return undefined;
+  }
+
+  if (lang === 'ru') {
+    // Если регион строго KZ, BY или RU И больше ничего после — возвращаем ru-<REGION>
+    if (region && SUPPORTED_RU_REGIONS.includes(region) && parts.length === 2) {
+      return `${lang}-${region}` as Locale;
     }
 
-    // Разбираем локаль на язык и регион
-    const [lang, region] = locale.split('-');
-    
-    // Если язык не поддерживается, возвращаем undefined
-    if (!SUPPORTED_LANGS.includes(lang as Lang)) {
-      return undefined;
-    }
+    // иначе всегда ru-RU
+    return 'ru-RU';
+  }
 
-    // Для русского языка проверяем/добавляем регион
-    if (lang === 'ru') {
-      // Если регион указан и поддерживается, используем его
-      if (region && SUPPORTED_RU_REGIONS.includes(region)) {
-        return locale as Locale;
-      }
-      // Если регион не указан или не поддерживается,
-      // получаем регион из сервиса
-      const detectedRegion = geoService.getCurrentRegion(location.search);
-      // Если определенный регион поддерживается, используем его
-      if (SUPPORTED_RU_REGIONS.includes(detectedRegion)) {
-        return `${lang}-${detectedRegion}` as Locale;
-      }
-      // Если регион не поддерживается, возвращаем только язык
-      return lang as Locale;
-    }
+  return lang as Locale;
+};
 
-    // Для остальных языков возвращаем базовый язык
-    return lang as Locale;
-  };
+
 
   // 3. Управление локалью
   const [locale, setLocale] = useState<Locale>(() => {
