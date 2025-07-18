@@ -8,6 +8,7 @@ import { getTranslations } from '@/lib/translations';
 import type { Lang, Locale } from '@/types';
 
 import { Loader } from './loader';
+import { geoService } from '@/lib';
 
 type I18nContextType = {
   locale: Locale;
@@ -124,18 +125,34 @@ export const I18nProvider = ({ children }: { children: React.ReactNode }) => {
 
   // 5. Редирект при изменении локали или если нужно добавить регион
   useEffect(() => {
-    // Получаем нормализованную локаль из URL
+  const handleRedirect = () => {
     const normalizedLocale = getValidLocale(urlLocale);
 
-    // Редирект нужен в следующих случаях:
-    // 1. Нет локали в URL
-    // 2. Локаль в URL отличается от текущей
-    // 3. Нормализованная локаль отличается от локали в URL
-    if (!urlLocale || locale !== urlLocale || (normalizedLocale && normalizedLocale !== urlLocale)) {
-      const newPath = location.pathname.replace(/^\/[^/]*/, `/${locale}`);
+    const queryString = location.search; // получаем query params
+    const userRegion = geoService.getCurrentRegion(queryString);
+
+    let targetLocale = locale;
+
+    if (locale.startsWith('ru')) {
+      // если регион пользователя не поддерживаемый - оставить просто 'ru'
+      if (!SUPPORTED_RU_REGIONS.includes(userRegion)) {
+        targetLocale = 'ru';
+      } else {
+        targetLocale = `ru-${userRegion}` as Locale;
+      }
+    }
+
+    // если URL-локаль не совпадает с целевой локалью - редиректим
+    if (!urlLocale || targetLocale !== urlLocale || (normalizedLocale && normalizedLocale !== urlLocale)) {
+        setLocale(targetLocale); // <== Обновляем locale перед редиректом
+      const newPath = location.pathname.replace(/^\/[^/]*/, `/${targetLocale}`);
       navigate(newPath, { replace: true });
     }
-  }, [locale, urlLocale, location.pathname]);
+  };
+
+  handleRedirect();
+}, [locale, urlLocale, location.pathname, location.search]);
+
 
   useEffect(() => {
     const lang = locale.split('-')[0] as keyof typeof titleTranslations;
